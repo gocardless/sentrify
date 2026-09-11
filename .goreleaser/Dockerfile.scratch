@@ -1,0 +1,14 @@
+FROM alpine:3.16 AS alpine
+# Needed to validate https endpoints (sentrify talks to Sentry over HTTPS)
+RUN apk --update --no-cache add ca-certificates
+
+# This image isn't meant to be run on its own - there's nothing in it to
+# wrap. It exists so other images can pull the static binary in with a
+# multi-stage COPY --from, e.g.:
+#
+#   COPY --from=ghcr.io/gocardless/sentrify:latest /bin/sentrify /bin/sentrify
+FROM scratch
+ARG TARGETPLATFORM
+COPY --from=alpine /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY $TARGETPLATFORM/sentrify /bin/sentrify
+ENTRYPOINT ["/bin/sentrify"]

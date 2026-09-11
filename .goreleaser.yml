@@ -1,0 +1,64 @@
+# View goreleaser docs for configuration settings
+# https://goreleaser.com
+
+---
+project_name: sentrify
+version: 2
+
+builds:
+  - id: sentrify
+    binary: sentrify
+    main: .
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags: >
+      -X main.Version={{.Version}}
+      -X main.Commit={{.Commit}}
+      -X main.Date={{.Date}}
+      -X main.SentryDSN={{.Env.SENTRY_DSN}}
+      -a
+      -installsuffix cgo
+    env:
+      - CGO_ENABLED=0
+
+# Plain tar.gz archives of the binary, for servers that just download and
+# extract the GitHub release asset directly (this is the primary use case:
+# VM provisioning pulls the binary straight from a release, no Docker or
+# package manager involved).
+archives:
+  - id: sentrify
+    ids:
+      - sentrify
+
+# .deb packages, for servers that install it via dpkg (e.g. a Chef recipe
+# using `github_asset` + `dpkg_package` resources to fetch and install this
+# release asset).
+nfpms:
+  - file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: GoCardless
+    homepage: https://github.com/gocardless/sentrify
+    maintainer: GoCardless Engineering <engineering@gocardless.com>
+    description: Wraps a system command, reporting failures to Sentry
+    formats:
+      - deb
+
+# A `FROM scratch` image containing just the static binary, meant to be
+# pulled into other images with a multi-stage `COPY --from=` rather than run
+# on its own. Built for both platforms we compile, giving a proper multi-arch
+# manifest.
+dockers_v2:
+  - id: sentrify
+    ids:
+      - sentrify
+    dockerfile: .goreleaser/Dockerfile.scratch
+    images:
+      - ghcr.io/gocardless/sentrify
+    tags:
+      - "{{ .Tag }}"
+      - latest
+    platforms:
+      - linux/amd64
+      - linux/arm64

@@ -1,56 +1,86 @@
-# Blank Template
+# sentrify
 
-> TODO: Describe your service here, indicating its purpose and the features it provides.
-> Example: [appetiser](https://github.com/gocardless/appetiser#appetiser)
+Wraps a system command, reporting failures to Sentry.
+
+`sentrify` runs the command you give it, streaming its output as normal. If
+the command exits non-zero, the wrapper reports the failure (including
+captured stderr) to Sentry, then exits `0` itself — the point is to let
+Sentry carry the alert instead of the process's own exit code, which suits
+wrapping cron jobs and scheduled scripts where you don't want a second,
+exit-code-based alerting path racing the Sentry one.
+
+## Installation
+
+The primary use case is a VM downloading the binary from a GitHub release
+during server configuration. Each release publishes, per `linux/amd64` and
+`linux/arm64`:
+
+- A `sentrify_<version>_linux_<arch>.tar.gz` archive containing the plain
+  binary.
+- A `sentrify_<version>_linux_<arch>.deb` package, installing to
+  `/usr/bin/sentrify` (e.g. via a Chef recipe's `github_asset` +
+  `dpkg_package` resources).
+
+There's also a `FROM scratch` Docker image at
+`ghcr.io/gocardless/sentrify`, containing just the static binary and CA
+certificates. It isn't meant to be run on its own — since `sentrify` wraps a
+command that has to live in the same container — but other images can pull
+the binary in with a multi-stage build:
+
+```dockerfile
+COPY --from=ghcr.io/gocardless/sentrify:latest /bin/sentrify /bin/sentrify
+```
 
 ## Usage
 
-> TODO: Describe how you use your service here.
-> Example: [appetiser](https://github.com/gocardless/appetiser#usage)
+```
+sentrify [--tag key=value]... [--timeout duration] [--] <command> [args...]
+```
 
-## Contributing
+```
+      --tag strings        Tags in key=value format that will be sent to Sentry
+      --timeout duration   Timeout for contacting Sentry (default 10s)
+```
 
-### Structure
+Use `--` to mark the end of sentrify's own flags, so anything after it —
+including flags — is passed straight through to the wrapped command:
 
-> TODO: What's the structure of your code? For example, do you have separate server and client codebases?
->Example: [appetiser](https://github.com/gocardless/appetiser#how-is-appetiser-built)
+```sh
+sentrify --tag env=prod --timeout 5s -- /bin/bash sync-bi-data --verbose
+```
 
-### Infrastructure
+## Configuration
 
-> TODO: What infrastructure does your application depend on and what's the availability of these dependencies.
-> Example: [payment-service](https://github.com/gocardless/payments-service#infrastructure-dependencies)
+sentrify needs a Sentry DSN to report to. It looks for one in this order:
 
-### Monitoring and Alerting
+1. The `SENTRY_DSN` environment variable.
+2. A DSN compiled into the binary at build time (via `-X main.SentryDSN=...`),
+   for production releases.
 
-> TODO: What monitoring and alerting does your application have?
-> Example: [appetiser](https://github.com/gocardless/appetiser#monitoring-and-alerting)
+If neither is set, sentrify logs a warning and runs the wrapped command
+without reporting failures anywhere — this is the expected behaviour in
+development.
 
-### Dependencies
+## Building
 
-> TODO: What dependencies do you require to build this service locally (eg. Docker, Ruby)?
-> Example: [appetiser](https://github.com/gocardless/appetiser#dependencies)
+```sh
+go build .
+```
 
-### Getting started
+To stamp version metadata into the binary, matching what's attached to every
+Sentry event:
 
-> TODO: Provide a step-by-step guide to running the service locally from a clean git clone.
-> Example: [appetiser](https://github.com/gocardless/appetiser#getting-started)
+```sh
+go build -ldflags "\
+  -X main.Version=$(git describe --tags --always) \
+  -X main.Commit=$(git rev-parse HEAD) \
+  -X main.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
 
-### Testing
+Releases (archives, `.deb` packages, and the Docker image) are built with
+[GoReleaser](https://goreleaser.com), configured in `.goreleaser.yml`. To
+build everything locally without publishing:
 
-> TODO: How do you run your service's automated tests?
-> Example: [appetiser](https://github.com/gocardless/appetiser#testing)
-
-### Deployment
-
-> TODO: How is your service deployed?
-> Example: [appetiser](https://github.com/gocardless/appetiser#deployment)
-
-### Configuration and Environment Variables
-
-> TODO: Does your service have any environment variables? If so, what behaviour is governed by their values?
-> Example: [appetiser](https://github.com/gocardless/appetiser#configuration)
-
-## Learning resources
-
-> TODO: Any useful learning resources a developer may want to read regarding your service?
-> Example: [appetiser](https://github.com/gocardless/appetiser#learning-resources)
+```sh
+goreleaser release --snapshot --clean
+```
