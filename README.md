@@ -84,3 +84,9 @@ build everything locally without publishing:
 ```sh
 goreleaser release --snapshot --clean
 ```
+
+Releasing is driven by the `VERSION` file: bumping it and merging to `master`
+is what cuts a release. `.github/workflows/release.yml` runs only when that
+merge changes `VERSION`, and only if the corresponding tag (`v<VERSION>`)
+doesn't already exist — it tags the commit, then runs GoReleaser to publish
+the archives, `.deb` packages, and Docker image for that tag.
