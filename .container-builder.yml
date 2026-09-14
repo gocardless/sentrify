@@ -1,4 +1,0 @@
-# See https://backstage.gocardless.io/docs/default/component/container-builder/container-builder-yml/#customising-builds-with-container-builderyml
-# for documentation on this file.
-dockerfiles:
-  - path: Dockerfile
