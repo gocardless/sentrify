@@ -1,4 +1,4 @@
-FROM alpine:3.16 AS alpine
+FROM alpine:3.24 AS alpine
 # Needed to validate https endpoints (sentrify talks to Sentry over HTTPS)
 RUN apk --update --no-cache add ca-certificates
 
